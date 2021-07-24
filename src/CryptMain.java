@@ -1,23 +1,32 @@
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Scanner;
 
+/**
+ * CLI that implements the AESGCMCrypt class. Using the CLI you can encrypt/decrypt
+ * files, display a help menu, and quit the program.
+ */
 public class CryptMain {
     public static void main(String[] args) {
         String choice;
-        String menu = """
-                +---------------------------------------------------------------+
-                |              AES-GCM-128 File encryptor/decryptor             |
-                |                           by: vsnoopy                         |
-                +---------------------------------------------------------------+
-                |                        Available commands                     |
-                | 'e' => encrypt a file                                         |
-                | 'd' => decrypt a file                                         |
-                | 'h' => help                                                   |
-                | 'q' => exit program                                           |
-                +---------------------------------------------------------------+
-                """;
+        StringBuilder sb = new StringBuilder();
 
-        AESGCMCrypt aesgcmCrypt = new AESGCMCrypt();
+        sb.append("+---------------------------------------------------------------+\n");
+        sb.append("|              AES-GCM-128 File encryptor/decryptor             |\n");
+        sb.append("|                           by: vsnoopy                         |\n");
+        sb.append("+---------------------------------------------------------------+\n");
+        sb.append("|                        Available commands                     |\n");
+        sb.append("| 'e' => encrypt a file                                         |\n");
+        sb.append("| 'd' => decrypt a file                                         |\n");
+        sb.append("| 'h' => help                                                   |\n");
+        sb.append("| 'q' => exit program                                           |\n");
+        sb.append("+---------------------------------------------------------------+\n");
+        String menu = sb.toString();
+
+        AESGCMCrypt aesgcmCrypt = new AESGCMCrypt(128,12);
         Scanner scanner = new Scanner(System.in);
 
         System.out.print(menu);
@@ -29,22 +38,23 @@ public class CryptMain {
             String filepath;
             String password;
 
-            choice = getInput(scanner);
+            System.out.print("Crypt# ");
+            choice = scanner.nextLine();
 
             switch (choice) {
 
                 case "e": //encrypt
                     System.out.print("File to encrypt (if file is not in same dir, use absolute path): ");
                     try {
-                        filepath = getInput(scanner);
-                        data = CryptFM.readFileToBytes(filepath);
+                        filepath = scanner.nextLine();
+                        data = readFileToBytes(filepath);
                     } catch (IOException e) {
                         System.out.println("Error: file cannot be found");
                         break;
                     }
 
                     System.out.print("Password (dont forget or you cant decrypt): ");
-                    password = getInput(scanner);
+                    password = scanner.nextLine();
 
                     if (!requestConfirmation(scanner)) break;
 
@@ -69,7 +79,7 @@ public class CryptMain {
 
                     System.out.println("Writing encrypted file...");
                     try {
-                        CryptFM.writeBytesToFile(filepath + ".glm8", encData);
+                        writeBytesToFile(filepath + ".glm8", encData);
                     } catch (IOException ex) {
                         System.out.println("Error: could not write encrypted data");
                         break;
@@ -84,8 +94,8 @@ public class CryptMain {
                 case "d": //decrypt
                     System.out.print("File to decrypt (if file is not in same dir, use absolute path): ");
                     try {
-                        filepath = getInput(scanner);
-                        encData = CryptFM.readFileToBytes(filepath);
+                        filepath = scanner.nextLine();
+                        encData = readFileToBytes(filepath);
                     } catch (IOException e) {
                         System.out.print("Error: file cannot be found");
                         break;
@@ -94,13 +104,13 @@ public class CryptMain {
                     while(true) {
                         if (requestConfirmation(scanner, "Decryption method (y=password/n=key): ")) {
                             System.out.print("Enter password: ");
-                            password = getInput(scanner);
+                            password = scanner.nextLine();
                             iv = aesgcmCrypt.getIV(encData);
                             System.out.println("Decrypting...");
                             try {
                                 key = aesgcmCrypt.generateSecretKey(password, iv);
                                 data = aesgcmCrypt.decrypt(encData, key);
-                                CryptFM.writeBytesToFile(filepath.replace(".glm8", ""), data);
+                                writeBytesToFile(filepath.replace(".glm8", ""), data);
                                 System.out.println(filepath + " successfully decrypted...");
                                 break;
                             } catch (CryptException | IOException e) {
@@ -112,11 +122,11 @@ public class CryptMain {
 
                         } else {
                             System.out.print("Enter key (hex format): ");
-                            key = hexStringToByteArray(getInput(scanner));
+                            key = hexStringToByteArray(scanner.nextLine());
                             System.out.println("Decrypting...");
                             try {
                                 data = aesgcmCrypt.decrypt(encData, key);
-                                CryptFM.writeBytesToFile(filepath.replace(".glm8", ""), data);
+                                writeBytesToFile(filepath.replace(".glm8", ""), data);
                                 System.out.println(filepath + " successfully decrypted...");
                                 break;
                             } catch (CryptException | IOException e) {
@@ -130,15 +140,7 @@ public class CryptMain {
                     break;
 
                 case "h": //display menu
-                    System.out.print("""
-                            +---------------------------------------------------------------+
-                            |                        Available commands                     |
-                            | 'e' => encrypt a file                                         |
-                            | 'd' => decrypt a file                                         |
-                            | 'h' => help                                                   |
-                            | 'q' => exit program                                           |
-                            +---------------------------------------------------------------+
-                            """);
+                    System.out.print(menu);
                     break;
 
                 case "q": //quit
@@ -182,7 +184,7 @@ public class CryptMain {
             hexChars[j * 2] = hexArray[v >>> 4];
             hexChars[j * 2 + 1] = hexArray[v & 0x0F];
         }
-        return new String(hexChars);
+        return String.valueOf(hexChars);
     }
 
     private static byte[] hexStringToByteArray(String s) {
@@ -195,8 +197,14 @@ public class CryptMain {
         return data;
     }
 
-    private static String getInput(Scanner scanner) {
-        System.out.print("Crypt# ");
-        return scanner.nextLine();
+    private static void writeBytesToFile(String path, byte[] data) throws IOException {
+        try (FileOutputStream fileOutputStream = new FileOutputStream(path)) {
+            fileOutputStream.write(data);
+        }
+    }
+
+    private static byte[] readFileToBytes(String file) throws IOException {
+        Path path = Paths.get(file);
+        return Files.readAllBytes(path);
     }
 }

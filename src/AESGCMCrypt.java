@@ -14,7 +14,7 @@ import java.util.Arrays;
 /**
  * This class can be used to encrypt/decrypt a byte array using the AES-128 GCM algorithm.
  * AES-256 can be used here, but many systems do not have the required java packages.
- * A 12 byte IV is recommended for GCM but you may also use 16 bytes.
+ * A 12 byte IV is recommended for GCM but you may also use 16 bytes. crypt
  *
  * @since 7/18/2021
  * @author snoopy
@@ -22,9 +22,17 @@ import java.util.Arrays;
  */
 public class AESGCMCrypt {
 
-    private final int KEY_LENGTH = 128;
-    private final int IV_LENGTH = 12;
+    private final String ALGORITHM = "AES/GCM/NoPadding"; // AES-GCM
+    private int keyLength; // 128, 192, 256, 512
+    private int ivLength; // initialization vector (recommend 12)
+    private SecureRandom secureRandom;
 
+
+    public AESGCMCrypt(int keyLength, int ivLength) {
+        this.keyLength = keyLength;
+        this.ivLength = ivLength;
+        secureRandom = new SecureRandom();
+    }
     /**
      *
      * @param password to derive key from
@@ -33,7 +41,7 @@ public class AESGCMCrypt {
      */
     public byte[] generateSecretKey(String password, byte[] iv) throws CryptException {
         final int ITERATION_COUNT = 131072;
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), iv, ITERATION_COUNT, KEY_LENGTH);
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), iv, ITERATION_COUNT, keyLength);
         try {
             SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
             return secretKeyFactory.generateSecret(spec).getEncoded();
@@ -48,8 +56,7 @@ public class AESGCMCrypt {
      * @return random iv
      */
     public byte[] createIV() {
-        byte[] iv = new byte[IV_LENGTH];
-        SecureRandom secureRandom = new SecureRandom();
+        byte[] iv = new byte[ivLength];
         secureRandom.nextBytes(iv);
         return iv;
     }
@@ -65,8 +72,8 @@ public class AESGCMCrypt {
     public byte[] encrypt(byte[] data, byte[] key, byte[] iv) throws CryptException {
         try {
             // Prepare cipher
-            Cipher encCipher = Cipher.getInstance("AES/GCM/NoPadding");
-            encCipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(KEY_LENGTH, iv));
+            Cipher encCipher = Cipher.getInstance(ALGORITHM);
+            encCipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, ALGORITHM), new GCMParameterSpec(keyLength, iv));
 
             byte[] encData = encCipher.doFinal(data);
 
@@ -96,11 +103,11 @@ public class AESGCMCrypt {
         byte[] iv = getIV(encDataAndIV);
 
         try {
-            Cipher decCipher = Cipher.getInstance("AES/GCM/NoPadding");
-            decCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"),
-                    new GCMParameterSpec(KEY_LENGTH, iv));
+            Cipher decCipher = Cipher.getInstance(ALGORITHM);
+            decCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, ALGORITHM),
+                    new GCMParameterSpec(keyLength, iv));
 
-            return decCipher.doFinal(encDataAndIV, 1 + IV_LENGTH, encDataAndIV.length - (1 + IV_LENGTH));
+            return decCipher.doFinal(encDataAndIV, 1 + ivLength, encDataAndIV.length - (1 + ivLength));
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException
                 | InvalidKeyException | IllegalBlockSizeException | InvalidAlgorithmParameterException e) {
             throw new CryptException("Error: ", e);
@@ -116,7 +123,7 @@ public class AESGCMCrypt {
     public byte[] getIV(byte[] encDataAndIV) {
         int ivSize = encDataAndIV[0];
         // Check that IV is proper size
-        if (ivSize != IV_LENGTH) {
+        if (ivSize != ivLength) {
             throw new IllegalStateException("Invalid IV length. Are you sure the file is AES-GCM encrypted?");
         }
         return Arrays.copyOfRange(encDataAndIV, 1, (ivSize + 1));
