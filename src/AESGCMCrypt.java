@@ -12,22 +12,32 @@ import java.security.spec.KeySpec;
 import java.util.Arrays;
 
 /**
- * This class can be used to encrypt/decrypt a byte array using the AES-128 GCM algorithm.
- * AES-256 can be used here, but many systems do not have the required java packages.
- * A 12 byte IV is recommended for GCM but you may also use 16 bytes. crypt
+ * This class can be used to encrypt/decrypt a byte array using the AES-GCM algorithm.
+ * To use key lengths greater than 128, you must install the Java Cryptography Extension
+ * if it is not already. A 12 byte IV is recommended for GCM but you may also use 16 bytes.
  *
  * @since 7/18/2021
  * @author snoopy
- * @version 1.0
+ * @version 1.1
  */
 public class AESGCMCrypt {
 
     private final String ALGORITHM = "AES/GCM/NoPadding"; // AES-GCM
-    private int keyLength; // 128, 192, 256, 512
-    private int ivLength; // initialization vector (recommend 12)
+    private int keyLength = 128; // 128, 192, 256, 512 (default 128)
+    private int ivLength = 12; // initialization vector (recommend 12)
     private SecureRandom secureRandom;
 
+    /**
+     * Constructor: new instance using default values. (128 bit key and 12 byte IV)
+     */
+    public AESGCMCrypt() {
+        secureRandom = new SecureRandom();
+    }
 
+    /**
+     * Constructor: new instance using custom values. Proper values should be checked before they are
+     * passed to the constructor or else exceptions will be thrown.
+     */
     public AESGCMCrypt(int keyLength, int ivLength) {
         this.keyLength = keyLength;
         this.ivLength = ivLength;
@@ -73,11 +83,11 @@ public class AESGCMCrypt {
         try {
             // Prepare cipher
             Cipher encCipher = Cipher.getInstance(ALGORITHM);
-            encCipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, ALGORITHM), new GCMParameterSpec(keyLength, iv));
+            encCipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(keyLength, iv));
 
             byte[] encData = encCipher.doFinal(data);
 
-            // ByteBuffer to collect IV size, IV, and encrypted data into a byte array.
+            // ByteBuffer to collect IV size, IV, and encrypted data into one array.
             ByteBuffer byteBuffer = ByteBuffer.allocate(1 + iv.length + encData.length);
 
             byteBuffer.put((byte) iv.length);
@@ -127,5 +137,37 @@ public class AESGCMCrypt {
             throw new IllegalStateException("Invalid IV length. Are you sure the file is AES-GCM encrypted?");
         }
         return Arrays.copyOfRange(encDataAndIV, 1, (ivSize + 1));
+    }
+
+    /**
+     * Returns the iv length
+     * @return iv length
+     */
+    public int getIvLength() {
+        return ivLength;
+    }
+
+    /**
+     * Sets the iv length
+     * @param ivLength
+     */
+    public void setIvLength(int ivLength) {
+        this.ivLength = ivLength;
+    }
+
+    /**
+     * Returns the key length
+     * @return key length
+     */
+    public int getKeyLength() {
+        return keyLength;
+    }
+
+    /**
+     * Sets the key length
+     * @param keyLength
+     */
+    public void setKeyLength(int keyLength) {
+        this.keyLength = keyLength;
     }
 }
