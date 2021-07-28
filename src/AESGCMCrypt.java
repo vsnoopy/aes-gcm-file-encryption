@@ -114,7 +114,7 @@ public class AESGCMCrypt {
 
         try {
             Cipher decCipher = Cipher.getInstance(ALGORITHM);
-            decCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, ALGORITHM),
+            decCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"),
                     new GCMParameterSpec(keyLength, iv));
 
             return decCipher.doFinal(encDataAndIV, 1 + ivLength, encDataAndIV.length - (1 + ivLength));
