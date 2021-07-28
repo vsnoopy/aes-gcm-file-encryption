@@ -6,28 +6,27 @@ import java.nio.file.Paths;
 import java.util.Scanner;
 
 /**
- * CLI that implements the AESGCMCrypt class. Using the CLI you can encrypt/decrypt
- * files, display a help menu, and quit the program.
+ * CLI that drives the AESGCMCrypt class. Using the CLI you can encrypt/decrypt
+ * files, change the key size and iv size, display a help menu, and quit the program.
  */
 public class CryptMain {
+
     public static void main(String[] args) {
-        String choice;
-        StringBuilder sb = new StringBuilder();
+        String menu = "+---------------------------------------------------------------+\n" +
+                "|              AES-GCM File encryptor/decryptor                 |\n" +
+                "|                           by: vsnoopy                         |\n" +
+                "+---------------------------------------------------------------+\n" +
+                "|                        Available commands                     |\n" +
+                "| 'e' => encrypt a file                                         |\n" +
+                "| 'd' => decrypt a file                                         |\n" +
+                "| 's' => settings                                               |\n" +
+                "| 'h' => help                                                   |\n" +
+                "| 'q' => exit program                                           |\n" +
+                "+---------------------------------------------------------------+\n";
 
-        sb.append("+---------------------------------------------------------------+\n");
-        sb.append("|              AES-GCM-128 File encryptor/decryptor             |\n");
-        sb.append("|                           by: vsnoopy                         |\n");
-        sb.append("+---------------------------------------------------------------+\n");
-        sb.append("|                        Available commands                     |\n");
-        sb.append("| 'e' => encrypt a file                                         |\n");
-        sb.append("| 'd' => decrypt a file                                         |\n");
-        sb.append("| 'h' => help                                                   |\n");
-        sb.append("| 'q' => exit program                                           |\n");
-        sb.append("+---------------------------------------------------------------+\n");
-        String menu = sb.toString();
-
-        AESGCMCrypt aesgcmCrypt = new AESGCMCrypt(128,12);
+        AESGCMCrypt crypt = new AESGCMCrypt();
         Scanner scanner = new Scanner(System.in);
+        String choice;
 
         System.out.print(menu);
 
@@ -44,6 +43,11 @@ public class CryptMain {
             switch (choice) {
 
                 case "e": //encrypt
+                    System.out.println("Current settings: ");
+                    System.out.println("key length = " + crypt.getKeyLength() + "\nIV length = " + crypt.getIvLength() + "\n");
+
+                    if (!requestConfirmation(scanner)) break;
+
                     System.out.print("File to encrypt (if file is not in same dir, use absolute path): ");
                     try {
                         filepath = scanner.nextLine();
@@ -56,14 +60,12 @@ public class CryptMain {
                     System.out.print("Password (dont forget or you cant decrypt): ");
                     password = scanner.nextLine();
 
-                    if (!requestConfirmation(scanner)) break;
-
                     System.out.println("Generating IV...");
-                    byte[] iv = aesgcmCrypt.createIV();
+                    byte[] iv = crypt.createIV();
 
                     System.out.println("Generating key...");
                     try {
-                        key = aesgcmCrypt.generateSecretKey(password, iv);
+                        key = crypt.generateSecretKey(password, iv);
                     } catch (CryptException e) {
                         System.out.println("Error: could not generate key");
                         break;
@@ -71,7 +73,7 @@ public class CryptMain {
 
                     System.out.println("Encrypting...");
                     try {
-                        encData = aesgcmCrypt.encrypt(data, key, iv);
+                        encData = crypt.encrypt(data, key, iv);
                     } catch (CryptException e) {
                         System.out.println("Error: could not encrypt");
                         break;
@@ -84,14 +86,20 @@ public class CryptMain {
                         System.out.println("Error: could not write encrypted data");
                         break;
                     }
-                    System.out.println(filepath + " has been successfully encrypted.");
-                    System.out.println("File formatted as follows: \n\t IV_LENGTH | IV | ENCRYPTED DATA");
+                    System.out.println(filepath + " has been successfully encrypted.\n");
+                    System.out.println("File formatted as follows: \n\t IV_LENGTH | IV | ENCRYPTED DATA\n");
+                    System.out.println("========Encryption Information=======");
                     System.out.println("key (hex, save this somewhere secure): " + bytesToHex(key));
-                    System.out.println("IV length: " + iv.length);
-                    System.out.println("IV (hex): " + bytesToHex(iv));
+                    System.out.println("IV length (stored in file): " + iv.length);
+                    System.out.println("IV (hex, also stored in file): " + bytesToHex(iv));
                     break;
 
                 case "d": //decrypt
+                    System.out.println("Current settings: ");
+                    System.out.println("key length = " + crypt.getKeyLength() + "\nIV length = " + crypt.getIvLength() + "\n");
+
+                    if (!requestConfirmation(scanner)) break;
+
                     System.out.print("File to decrypt (if file is not in same dir, use absolute path): ");
                     try {
                         filepath = scanner.nextLine();
@@ -105,11 +113,11 @@ public class CryptMain {
                         if (requestConfirmation(scanner, "Decryption method (y=password/n=key): ")) {
                             System.out.print("Enter password: ");
                             password = scanner.nextLine();
-                            iv = aesgcmCrypt.getIV(encData);
+                            iv = crypt.getIV(encData);
                             System.out.println("Decrypting...");
                             try {
-                                key = aesgcmCrypt.generateSecretKey(password, iv);
-                                data = aesgcmCrypt.decrypt(encData, key);
+                                key = crypt.generateSecretKey(password, iv);
+                                data = crypt.decrypt(encData, key);
                                 writeBytesToFile(filepath.replace(".glm8", ""), data);
                                 System.out.println(filepath + " successfully decrypted...");
                                 break;
@@ -125,12 +133,12 @@ public class CryptMain {
                             key = hexStringToByteArray(scanner.nextLine());
                             System.out.println("Decrypting...");
                             try {
-                                data = aesgcmCrypt.decrypt(encData, key);
+                                data = crypt.decrypt(encData, key);
                                 writeBytesToFile(filepath.replace(".glm8", ""), data);
                                 System.out.println(filepath + " successfully decrypted...");
                                 break;
                             } catch (CryptException | IOException e) {
-                                System.out.println("Error: invalid key");
+                                System.out.println("Error: invalid key.");
                                 if (!requestConfirmation(scanner, "Try again? (y/n): ")) {
                                     break;
                                 }
@@ -138,6 +146,31 @@ public class CryptMain {
                         }
                     }
                     break;
+
+                case "s": // Settings
+                    int keyLength = crypt.getKeyLength();
+                    int ivLength = crypt.getIvLength();
+
+                    System.out.println("Current settings: ");
+                    System.out.println("key length = " + keyLength + "\nIV length = " + ivLength + "\n");
+
+                    while(requestConfirmation(scanner, "Do you want to change the key length? (y/n): ")) {
+                            System.out.print("Enter key size (128,196,256,512): ");
+                            keyLength = Integer.parseInt(scanner.nextLine());
+                            if (keyLength == 128 || keyLength == 196 || keyLength == 256 || keyLength == 512) {
+                                crypt.setKeyLength(keyLength);
+                                break;
+                            } else System.out.println("Error: invalid key length");
+                    }
+                    if (requestConfirmation(scanner, "Do you want to change the iv length? (y/n): ")) {
+                        System.out.print("Enter iv size (recommended you use 12 or 16): ");
+                        ivLength = Integer.parseInt(scanner.nextLine());
+                        crypt.setIvLength(ivLength);
+                    }
+                    System.out.println("Updated settings:");
+                    System.out.println("key length = " + keyLength + "\nIV length = " + ivLength + "\n");
+                    break;
+
 
                 case "h": //display menu
                     System.out.print(menu);
